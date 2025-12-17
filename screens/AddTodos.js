@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
 
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -8,65 +8,67 @@ import {
   TouchableOpacity,
   TextInput,
 } from "react-native";
-import { moderateScale, verticalScale, scale } from "react-native-size-matters";
+
+import { moderateScale, verticalScale } from "react-native-size-matters";
 import AntDesign from "@expo/vector-icons/AntDesign";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { Audio } from "expo-av";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Toast from "react-native-toast-message";
 import { useNavigation } from "@react-navigation/native";
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import Toast from 'react-native-toast-message';
- import AsyncStorage from '@react-native-async-storage/async-storage';
- import FontAwesome from '@expo/vector-icons/FontAwesome';
+
+import { OPENAI_API_KEY } from "@env";
 
 
 const { width, height } = Dimensions.get("window");
 
-const AddTodos = () => {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState('')
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
 
+
+
+
+
+
+
+const AddTodos = () => {
   const navigation = useNavigation();
 
-  const GoBack = () => {
-    navigation.navigate("TaskListScreen");
-  };
-
-
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [recording, setRecording] = useState(null);
+  const [isListening, setIsListening] = useState(false);
 
 
   useEffect(() => {
     if (error) {
       Toast.show({
         type: "error",
-        text1: "🚫  Failed",
+        text1: "🚫 Error",
         text2: error,
         position: "top",
-        visibilityTime: 4000,
-        topOffset: 40,
       });
-      setError('')
+      setError("");
     }
   }, [error]);
-
 
   useEffect(() => {
     if (message) {
       Toast.show({
         type: "success",
-        text1: "✅ Successful",
+        text1: "✅ Success",
         text2: message,
         position: "top",
-        visibilityTime: 3000,
-        topOffset: 40,
       });
-  
-      setTitle('')
-      setDescription('')
-      setMessage('')
+      setMessage("");
     }
   }, [message]);
 
 
+
+
+  
 
 // this function handles the creation of new todos and
 // saving them in Async storage as well
@@ -107,15 +109,124 @@ const AddTodos = () => {
 
 
 
+  /* start recording Function */
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        setError("Microphone permission denied");
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+
+      setRecording(recording);
+      setIsListening(true);
+    } catch {
+      setError("Could not start recording");
+    }
+  };
+
+  /*  Stop Recording function */
+  const stopRecording = async () => {
+    try {
+      if (!recording) return;
+
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+
+      setRecording(null);
+      setIsListening(false);
+
+      if (!uri) {
+        setError("Recording failed, try again");
+        return;
+      }
+
+      await transcribeAudio(uri);
+    } catch {
+      setError("Failed to stop recording");
+    }
+  };
+
+
+  const transcribeAudio = async (uri) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", {
+        uri,
+        name: "speech.m4a",
+        type: "audio/m4a",
+      });
+      formData.append("model", "whisper-1");
+
+      const response = await fetch(
+        "https://api.openai.com/v1/audio/transcriptions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+      console.log(data)
+
+      if (!data.text || !data.text.trim()) {
+        setError("No speech detected — speak clearly and try again");
+        return;
+      }
+
+      await createTodosFromSpeech(data.text);
+    } catch {
+      setError("Speech transcription failed");
+    }
+  };
+
+  /* this functions helps me to   Split and save the  task */
+  const createTodosFromSpeech = async (speechText) => {
+    const tasks = speechText
+      .split(/and|,|\./i)
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    const stored = await AsyncStorage.getItem("@todos");
+    const todos = stored ? JSON.parse(stored) : [];
+
+    tasks.forEach((task) => {
+      todos.push({
+        id: Date.now().toString() + Math.random(),
+        title: task,
+        description: "",
+        completed: false,
+      });
+    });
+
+    await AsyncStorage.setItem("@todos", JSON.stringify(todos));
+    setMessage(`${tasks.length} task(s) added from voice`);
+  };
+
+
+
 
 
 
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={GoBack}>
-          <AntDesign
+   
+    <View style={styles.header}>
+         <TouchableOpacity onPress={() => navigation.goBack()}>
+           <AntDesign
             name="arrow-left"
             size={30}
             color="black"
@@ -139,12 +250,13 @@ const AddTodos = () => {
         </View>
       </View>
 
+    
+    
+       <View style={[styles.inputWrapper,{marginTop:height * 0.04}]}>
 
-      <View style={[styles.inputWrapper,{marginTop:height * 0.04}]}>
+         <Text style={styles.subtitle}>Todo Title</Text>
 
-        <Text style={styles.subtitle}>Todo Title</Text>
-
-        <TextInput
+         <TextInput
           placeholder="eg. email back Mrs James"
           placeholderTextColor="#aaa"
           style={styles.input}
@@ -154,21 +266,17 @@ const AddTodos = () => {
 
           {title &&
               <TouchableOpacity style={styles.cancleIcon} onPress={() => setTitle('')} >
-                <MaterialIcons name="cancel" size={24} color="black" />
+                <MaterialIcons name="cancel" size={20} color="black" />
              
               </TouchableOpacity>}
 
       </View>
 
+   
+         <View style={[styles.inputWrapper, {marginTop:height * 0.04}]}>
+      <Text style={styles.subtitle}>Todo Description (optional)</Text>
 
-
-
-
-
-      <View style={styles.inputWrapper}>
-     <Text style={styles.subtitle}>Todo Description (optional)</Text>
-
-        <TextInput
+         <TextInput
           placeholder="eg. email back Mrs. james for the new intern we have...."
           placeholderTextColor="#aaa"
           style={styles.textarea}
@@ -178,136 +286,35 @@ const AddTodos = () => {
           numberOfLines={4}
           textAlignVertical="top"
         />
+
+
+              {description &&
+              <TouchableOpacity style={styles.clearDesc} onPress={() => setDescription('')} >
+                <MaterialIcons name="cancel" size={20} color="black" />
+             
+              </TouchableOpacity>}
       </View>
 
 
-          <View style={styles.btnContainer}>
-                 <TouchableOpacity activeOpacity={0.6}  style={styles.button} onPress={HandleSubmit} >
-                 <Text style={styles.buttonText}>Add Todo</Text>
-            
-          </TouchableOpacity>
+       
 
-          </View>
-     
+  
+      <TouchableOpacity style={styles.button} onPress={HandleSubmit}>
+        <Text style={styles.buttonText}>Add Todo</Text>
+      </TouchableOpacity>
 
-
-
-
-      <Toast />
-
-
-
-           <TouchableOpacity
-        style={styles.mic}
+   
+      <TouchableOpacity
+        style={[styles.mic, isListening && { backgroundColor: "red" }]}
+        onPress={isListening ? stopRecording : startRecording}
       >
         <FontAwesome name="microphone" size={24} color="#fff" />
       </TouchableOpacity>
+
+      <Toast />
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "white",
-  },
-
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  inputWrapper: {
-    paddingHorizontal: width * 0.05,
-    paddingVertical:height * 0.01,
-    position: "relative",
-  },
-  input: {
-    width: "100%",
-    height: moderateScale(45),
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    fontSize: moderateScale(12),
-    backgroundColor: "#fff",
-     paddingRight: 40,
-  },
-
-  subtitle:{
-    paddingVertical: height *0.01,
-    paddingHorizontal:width * 0.005,
-    fontSize:moderateScale(14),
-    fontWeight:500
-
-  },
-
-  textarea: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 16,
-    color: "#000",
-    height: 130,
-  
-  },
-
-  title: {
-    fontSize: moderateScale(20),
-    fontWeight: 600,
-    textAlign: "center",
-  },
-  icon: {
-    paddingHorizontal: width * 0.05,
-    paddingVertical: height * 0.02,
-  },
-
-cancleIcon: {
-  position: "absolute",
-  right: moderateScale(23),     
-  top: verticalScale(45),      
-  zIndex: 10,                   
-},
-
-
-
-  button: {
-    paddingVertical: 15,
-    borderRadius: 30,
-    alignItems: "center",
-    backgroundColor:'black',
-    
-  },
-
-    buttonText: {
-    color: "#fff",
-    fontSize: moderateScale(16),
-    fontWeight: "600",
-  },
-
-  btnContainer:{
-        paddingHorizontal: width * 0.05,
-        marginTop:height * 0.02
-  },
-
-
-    mic: {
-    position: "absolute",
-    bottom: height * 0.04,
-    right: width * 0.05,
-    width: moderateScale(60),
-    height: moderateScale(60),
-    borderRadius: moderateScale(30),
-    backgroundColor: "black",
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 4,
-  },
-
-
-});
 
 export default AddTodos;
 
@@ -323,18 +330,88 @@ export default AddTodos;
 
 
 
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#fff" },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+  },
+
+  title: {
+    fontSize: moderateScale(18),
+    fontWeight: "600",
+    marginLeft: 20,
+  },
+
+  inputWrapper: {
+    paddingHorizontal: width * 0.05,
+    marginTop: 15,
+    position: "relative",
+  },
+
+  subtitle: {
+    fontSize: moderateScale(14),
+    marginBottom: 6,
+  },
+
+  input: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    padding: 12,
+    paddingRight: 40,
+  },
+
+  textarea: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    padding: 12,
+    height: 120,
+  },
+
+  cancleIcon: {
+    position: "absolute",
+    right: 25,
+    top: verticalScale(27),
+  },
+
+
+  
+  clearDesc: {
+    position: "absolute",
+    right: 25,
+    bottom: verticalScale(5),
+  },
 
 
 
 
+  button: {
+    marginTop: 20,
+    marginHorizontal: width * 0.05,
+    padding: 15,
+    backgroundColor: "black",
+    borderRadius: 30,
+    alignItems: "center",
+  },
 
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
 
-
-
-
-
-
-
-
-
-
+  mic: {
+    position: "absolute",
+    bottom: height * 0.04,
+    right: width * 0.05,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "black",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});

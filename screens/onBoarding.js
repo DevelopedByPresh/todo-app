@@ -29,7 +29,7 @@ const OnBoarding = () => {
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo  */}
+        {/* this is my  Logo  */}
         <View style={styles.center}>
           <Image
             source={require("../assets/todoLogo.png")}
