@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
+
 const { width, height } = Dimensions.get("window");
 
 const OnBoarding = () => {
