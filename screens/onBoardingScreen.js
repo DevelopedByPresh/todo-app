@@ -10,12 +10,10 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
-
 const { width, height } = Dimensions.get("window");
 
 const OnBoardingScreen = () => {
   const navigation = useNavigation();
-
 
   useEffect(() => {
     // i am using a  timeout here to simulate a splash / onboarding delay
@@ -26,13 +24,6 @@ const OnBoardingScreen = () => {
     // here, i am cleaning up to prevent memory leaks if component unmounts early
     return () => clearTimeout(timer);
   }, [navigation]); // i just included navigation  as a dependency
-
-
-
-
-
-
-
 
   return (
     <View style={styles.container}>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -7,9 +6,10 @@ import {
   Dimensions,
   TouchableOpacity,
   TextInput,
+  ActivityIndicator,
 } from "react-native";
 
-import { moderateScale, verticalScale } from "react-native-size-matters";
+import { moderateScale } from "react-native-size-matters";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
@@ -20,14 +20,7 @@ import { useNavigation } from "@react-navigation/native";
 
 import { OPENAI_API_KEY } from "@env";
 
-
 const { width, height } = Dimensions.get("window");
-
-
-
-
-
-
 
 const AddTodos = () => {
   const navigation = useNavigation();
@@ -38,7 +31,7 @@ const AddTodos = () => {
   const [message, setMessage] = useState("");
   const [recording, setRecording] = useState(null);
   const [isListening, setIsListening] = useState(false);
-
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (error) {
@@ -64,51 +57,41 @@ const AddTodos = () => {
     }
   }, [message]);
 
-
-
-
-  
-
-// this function handles the creation of new todos and
-// saving them in Async storage as well
-
+  // this function handles the creation of new todos and
+  // saving them in Async storage as well
   const HandleSubmit = async () => {
     if (!title.trim()) {
-      setError('Todo Title is Required');
+      setError("Todo Title is Required");
       return;
     }
 
     try {
       const newTodo = {
-        id: Date.now().toString(), 
-        title,
-        description,
+        id: Date.now().toString(),
+        title: title.trim(),
+        description: description.trim(), 
         completed: false,
       };
 
-      // here, i am trying to get existing todos 
+      // here, i am trying to get existing todos
       // and i had to parse it because Async storage only stores strings, just to convert it into an array
-      const storedTodos = await AsyncStorage.getItem('@todos');
+      const storedTodos = await AsyncStorage.getItem("@todos");
       const todos = storedTodos ? JSON.parse(storedTodos) : [];
 
       // with the array method Push(), i just add the new todo to the array.
       todos.push(newTodo);
 
       // here, i am saving updated todos
-      await AsyncStorage.setItem('@todos', JSON.stringify(todos));
+      await AsyncStorage.setItem("@todos", JSON.stringify(todos));
 
-      setMessage('Todo Added Successfully!');
-      setTitle('')
-      setDescription('')
+      setMessage("Todo Added Successfully!");
+      setTitle("");
+      setDescription("");
     } catch (err) {
-      setError('Failed to save todo');
+      setError("Failed to save todo");
       console.log(err);
     }
   };
-
-
-
-
 
   /* start recording Function */
   const startRecording = async () => {
@@ -140,6 +123,7 @@ const AddTodos = () => {
     try {
       if (!recording) return;
 
+      setLoading(true);
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
 
@@ -147,16 +131,18 @@ const AddTodos = () => {
       setIsListening(false);
 
       if (!uri) {
+        setLoading(false);
         setError("Recording failed, try again");
         return;
       }
 
       await transcribeAudio(uri);
+      setLoading(false);
     } catch {
+      setLoading(false);
       setError("Failed to stop recording");
     }
   };
-
 
   const transcribeAudio = async (uri) => {
     try {
@@ -180,7 +166,7 @@ const AddTodos = () => {
       );
 
       const data = await response.json();
-      console.log(data)
+      console.log(data);
 
       if (!data.text || !data.text.trim()) {
         setError("No speech detected — speak clearly and try again");
@@ -193,7 +179,7 @@ const AddTodos = () => {
     }
   };
 
-  /* this functions helps me to   Split and save the  task */
+  /* this functions helps me to Split and save the task */
   const createTodosFromSpeech = async (speechText) => {
     const tasks = speechText
       .split(/and|,|\./i)
@@ -216,18 +202,11 @@ const AddTodos = () => {
     setMessage(`${tasks.length} task(s) added from voice`);
   };
 
-
-
-
-
-
-
   return (
     <View style={styles.container}>
-   
-    <View style={styles.header}>
-         <TouchableOpacity onPress={() => navigation.goBack()}>
-           <AntDesign
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <AntDesign
             name="arrow-left"
             size={30}
             color="black"
@@ -251,13 +230,10 @@ const AddTodos = () => {
         </View>
       </View>
 
-    
-    
-       <View style={[styles.inputWrapper,{marginTop:height * 0.04}]}>
+      <View style={[styles.inputWrapper, { marginTop: height * 0.04 }]}>
+        <Text style={styles.subtitle}>Todo Title</Text>
 
-         <Text style={styles.subtitle}>Todo Title</Text>
-
-         <TextInput
+        <TextInput
           placeholder="eg. email back Mrs James"
           placeholderTextColor="#aaa"
           style={styles.input}
@@ -265,19 +241,24 @@ const AddTodos = () => {
           onChangeText={setTitle}
         />
 
-          {title &&
-              <TouchableOpacity style={styles.cancleIcon} onPress={() => setTitle('')} >
-                <MaterialIcons name="cancel" size={20} color="black" />
-             
-              </TouchableOpacity>}
-
+        {/* cancel icon for title */}
+        {title ? (
+          <TouchableOpacity
+            style={[
+              styles.cancelIcon,
+              { top: "50%", transform: [{ translateY: 3 }] },
+            ]}
+            onPress={() => setTitle("")}
+          >
+            <MaterialIcons name="cancel" size={20} color="black" />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
-   
-         <View style={[styles.inputWrapper, {marginTop:height * 0.04}]}>
-      <Text style={styles.subtitle}>Todo Description (optional)</Text>
+      <View style={[styles.inputWrapper, { marginTop: height * 0.04 }]}>
+        <Text style={styles.subtitle}>Todo Description (optional)</Text>
 
-         <TextInput
+        <TextInput
           placeholder="eg. email back Mrs. james for the new intern we have...."
           placeholderTextColor="#aaa"
           style={styles.textarea}
@@ -288,28 +269,34 @@ const AddTodos = () => {
           textAlignVertical="top"
         />
 
-
-              {description &&
-              <TouchableOpacity style={styles.clearDesc} onPress={() => setDescription('')} >
-                <MaterialIcons name="cancel" size={20} color="black" />
-             
-              </TouchableOpacity>}
+        {/* cancel icon for description */}
+        {description ? (
+          <TouchableOpacity
+            style={[
+              styles.clearDesc,
+              { top: "50%", transform: [{ translateY: 40 }] },
+            ]}
+            onPress={() => setDescription("")}
+          >
+            <MaterialIcons name="cancel" size={20} color="black" />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
-
-       
-
-  
       <TouchableOpacity style={styles.button} onPress={HandleSubmit}>
         <Text style={styles.buttonText}>Add Todo</Text>
       </TouchableOpacity>
 
-   
+      {/* microphone / voice transcription */}
       <TouchableOpacity
         style={[styles.mic, isListening && { backgroundColor: "red" }]}
         onPress={isListening ? stopRecording : startRecording}
       >
-        <FontAwesome name="microphone" size={24} color="#fff" />
+        {loading ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <FontAwesome name="microphone" size={24} color="#fff" />
+        )}
       </TouchableOpacity>
 
       <Toast />
@@ -318,18 +305,6 @@ const AddTodos = () => {
 };
 
 export default AddTodos;
-
-
-
-
-
-
-
-
-
-
-
-
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
@@ -373,22 +348,15 @@ const styles = StyleSheet.create({
     height: 120,
   },
 
-  cancleIcon: {
+  cancelIcon: {
     position: "absolute",
     right: 25,
-    top: verticalScale(27),
   },
 
-
-  
   clearDesc: {
     position: "absolute",
     right: 25,
-    bottom: verticalScale(5),
   },
-
-
-
 
   button: {
     marginTop: 20,
