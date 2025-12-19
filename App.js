@@ -1,8 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet } from 'react-native';
 
-import OnBoardingScreen from './screens/onBoarding';
-import TaskListScreen from './screens/TaskListScreen';
+import OnBoardingScreen from './screens/onBoardingScreen';
+import TodoListScreen from './screens/TodoListScreen';
 import AddTodos from './screens/AddTodos';
 
 
@@ -31,7 +31,7 @@ export default function App() {
 
     <Stack.Navigator screenOptions={{headerShown: false}}>
       <Stack.Screen name="OnBoardingScreen" component={OnBoardingScreen} />
-      <Stack.Screen name="TaskListScreen" component={TaskListScreen} />
+      <Stack.Screen name="TodoListScreen" component={TodoListScreen} />
       <Stack.Screen name="AddTodos" component={AddTodos} />
  
     </Stack.Navigator>

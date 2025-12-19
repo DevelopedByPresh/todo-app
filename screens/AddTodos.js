@@ -29,7 +29,6 @@ const { width, height } = Dimensions.get("window");
 
 
 
-
 const AddTodos = () => {
   const navigation = useNavigation();
 
@@ -99,6 +98,8 @@ const AddTodos = () => {
       await AsyncStorage.setItem('@todos', JSON.stringify(todos));
 
       setMessage('Todo Added Successfully!');
+      setTitle('')
+      setDescription('')
     } catch (err) {
       setError('Failed to save todo');
       console.log(err);

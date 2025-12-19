@@ -13,14 +13,26 @@ import { useNavigation } from "@react-navigation/native";
 
 const { width, height } = Dimensions.get("window");
 
-const OnBoarding = () => {
+const OnBoardingScreen = () => {
   const navigation = useNavigation();
 
+
   useEffect(() => {
-    setTimeout(() => {
-      navigation.navigate("TaskListScreen");
+    // i am using a  timeout here to simulate a splash / onboarding delay
+    const timer = setTimeout(() => {
+      navigation.navigate("TodoListScreen");
     }, 2000);
-  }, []);
+
+    // here, i am cleaning up to prevent memory leaks if component unmounts early
+    return () => clearTimeout(timer);
+  }, [navigation]); // i just included navigation  as a dependency
+
+
+
+
+
+
+
 
   return (
     <View style={styles.container}>
@@ -79,4 +91,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OnBoarding;
+export default OnBoardingScreen;
